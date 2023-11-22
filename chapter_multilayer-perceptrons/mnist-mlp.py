@@ -13,9 +13,11 @@ backend_inline.set_matplotlib_formats('svg')
 ## 超参数
 num_inputs = 28*28
 num_outputs = 10
+num_hiddens = 1024
 batch_size = 256
-learning_rate = 0.1
+learning_rate = 0.5
 num_epochs = 10
+gpu = torch.device('cuda')
 
 ## 导入MNIST数据
 trans = torchvision.transforms.ToTensor()
@@ -39,6 +41,7 @@ def evaluate_accuracy(net, data_iter):
   num_total = 0
   with torch.no_grad():
     for X, y in data_iter:
+      X, y = X.to(gpu), y.to(gpu)
       num_correct += accuracy(net(X), y)
       num_total += y.numel()
   return num_correct / num_total
@@ -52,6 +55,7 @@ def init_weights(m):
 def train_epoch(net, train_iter, loss, updater):
   net.train()
   for X, y in train_iter:
+    X, y = X.to(gpu), y.to(gpu)
     y_hat = net(X)
     l = loss(y_hat, y)
     updater.zero_grad()
@@ -64,21 +68,8 @@ def train(net, train_iter, test_iter, loss, num_epochs, updater):
     train_epoch(net, train_iter, loss, updater)
     acc = evaluate_accuracy(net, test_iter)
     print(f'epoch {epoch + 1}, accuracy {acc:f}')
-    
-def main():
-  train_iter, test_iter = load_mnist(batch_size)
 
-  net = nn.Sequential(nn.Flatten(),
-                      nn.Linear(num_inputs, num_outputs))
-  net.apply(init_weights)
-
-  loss = nn.CrossEntropyLoss()
-
-  trainer = torch.optim.SGD(net.parameters(), lr=learning_rate)
-
-  train(net, train_iter, test_iter, loss, num_epochs, trainer)
-
-## 可视化
+## 数据集可视化
 def show_images(imgs, num_rows, num_cols, titles=None):
   _, axes = plt.subplots(num_rows, num_cols)
   axes = axes.flatten()
@@ -95,15 +86,30 @@ def show_mnist(num_rows, num_cols):
   for X, y in train_iter:
     break
   show_images(X.reshape(fig_size, 28, 28), num_rows, num_cols, titles=list(y.numpy()))
-  
+
 def show_predict(net, test_iter, n=9):
-  for X, y in test_iter: break
-  trues = list(y.numpy())
-  preds = list(net(X).argmax(axis=1).numpy())
-  titles = [f'{true}\n{pred}' for true, pred in zip(trues, preds)]
-  show_images(X[0:n], 1, n, titles=titles[0:n])
-  
+  with torch.no_grad():
+    for X, y in test_iter: break
+    net = net.to('cpu')
+    trues = list(y.numpy())
+    preds = list(net(X).argmax(dim=1).numpy())
+    titles = [f'{true}\n{pred}' for true, pred in zip(trues, preds)]
+    show_images(X[0:n].reshape(n,28,28), 1, n, titles=titles[0:n])
+
 
 if __name__ == '__main__':
   show_mnist(5,9)
-  main()
+
+  train_iter, test_iter = load_mnist(batch_size)
+  net = nn.Sequential(nn.Flatten(),
+                      nn.Linear(num_inputs, num_hiddens),
+                      nn.ReLU(),
+                      nn.Linear(num_hiddens, num_outputs))
+  net = torch.jit.script(net.to(gpu))
+  net.apply(init_weights)
+  loss = nn.CrossEntropyLoss()
+  loss = torch.jit.script(loss.to(gpu))
+  trainer = torch.optim.SGD(net.parameters(), lr=learning_rate)
+  train(net, train_iter, test_iter, loss, num_epochs, trainer)
+
+  show_predict(net, test_iter)
