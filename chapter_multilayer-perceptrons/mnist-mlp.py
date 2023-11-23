@@ -42,18 +42,19 @@ def accuracy(y_hat, y):
   cmp = y_hat.type(y.dtype) == y
   return float(cmp.type(y.dtype).sum())
 
+@torch.no_grad()
 def evaluate_accuracy(net, data_iter):
   net.eval()
   num_correct = 0
   num_total = 0
-  with torch.no_grad():
-    for X, y in data_iter:
-      X, y = X.to(gpu), y.to(gpu)
-      num_correct += accuracy(net(X), y)
-      num_total += y.numel()
+  for X, y in data_iter:
+    X, y = X.to(gpu), y.to(gpu)
+    num_correct += accuracy(net(X), y)
+    num_total += y.numel()
   return num_correct / num_total
 
 ## 参数初始化
+@torch.no_grad
 def init_weights(m):
   if type(m) == nn.Linear:
     nn.init.normal_(m.weight,std=0.01)
@@ -93,14 +94,14 @@ def show_mnist(num_rows, num_cols):
   for X, y in train_iter: break
   show_images(X.reshape(fig_size, 28, 28), num_rows, num_cols, titles=list(y.numpy()))
 
+@torch.no_grad()
 def show_predict(net, test_iter, n=9):
-  with torch.no_grad():
-    for X, y in test_iter: break
-    net = net.to('cpu')
-    trues = list(y.numpy())
-    preds = list(net(X).argmax(dim=1).numpy())
-    titles = [f'{true}\n{pred}' for true, pred in zip(trues, preds)]
-    show_images(X[0:n].reshape(n,28,28), 1, n, titles=titles[0:n])
+  for X, y in test_iter: break
+  net = net.to('cpu')
+  trues = list(y.numpy())
+  preds = list(net(X).argmax(dim=1).numpy())
+  titles = [f'{true}\n{pred}' for true, pred in zip(trues, preds)]
+  show_images(X[0:n].reshape(n,28,28), 1, n, titles=titles[0:n])
 
 
 if __name__ == '__main__':
