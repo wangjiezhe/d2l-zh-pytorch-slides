@@ -3,3 +3,5 @@ data/
 __pycache__/
 .vscode/
 lightning_logs/
+checkpoints/
+submission*.csv
