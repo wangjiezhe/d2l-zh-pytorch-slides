@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
 import os.path
-import types
 
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from pytorch_lightning.callbacks import ModelCheckpoint
-from sklearn.model_selection import KFold
-from torch import Tensor, nn, optim
-from torch.utils.data import DataLoader, TensorDataset, random_split
+from torch import nn, optim
+from torch.utils.data import DataLoader, TensorDataset
 
 torch.set_float32_matmul_precision("high")
 
@@ -157,7 +155,7 @@ if __name__ == "__main__":
         dirpath="checkpoints/", save_last=True, filename="model-{epoch:02d}-{train_loss:.2f}"
     )
     trainer = pl.Trainer(
-        max_epochs=10000,
+        max_epochs=1000,
         log_every_n_steps=1,
         callbacks=[checkpoint_callback1, checkpoint_callback2],
     )

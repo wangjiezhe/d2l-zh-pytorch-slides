@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 import os.path
-import types
 
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from sklearn.model_selection import KFold
-from torch import Tensor, nn, optim
+from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset, random_split
 
 torch.set_float32_matmul_precision("high")
