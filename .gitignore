@@ -6,3 +6,5 @@ lightning_logs/
 checkpoints/
 submission*.csv
 .lr_find_*
+*.ckpt
+*.pth

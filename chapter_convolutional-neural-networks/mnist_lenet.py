@@ -5,15 +5,13 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.tuner import Tuner
-from scipy import optimize
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchmetrics import Accuracy
-from torchmetrics.functional import accuracy
 from torchvision.datasets import MNIST
-from torchvision.transforms import ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor
 
-torch.set_float32_matmul_precision("high")
+torch.set_float32_matmul_precision("medium")
 
 
 class MNISTDataModel(pl.LightningDataModule):
@@ -23,7 +21,7 @@ class MNISTDataModel(pl.LightningDataModule):
         self.batch_size = batch_size
         self.data_dir = data_dir
         self.num_workers = num_workers
-        self.trans = ToTensor()
+        self.trans = Compose([ToTensor(), Normalize((0.5,), (0.5,))])
 
     def prepare_data(self):
         MNIST(root=self.data_dir, download=True)
@@ -80,7 +78,7 @@ class MNISTModel(pl.LightningModule):
         y_hat = self(X)
         loss = self.loss(y_hat, y)
         acc = self.train_acc(y_hat, y)
-        metrics = {"train_loss": loss, "train_acc": acc}
+        metrics = {"loss/train": loss, "acc/train": acc}
         self.log_dict(metrics, prog_bar=True)
         return loss
 
@@ -89,7 +87,7 @@ class MNISTModel(pl.LightningModule):
         y_hat = self(X)
         loss = self.loss(y_hat, y)
         acc = self.val_acc(y_hat, y)
-        metrics = {"val_loss": loss, "val_acc": acc}
+        metrics = {"loss/val": loss, "acc/val": acc}
         self.log_dict(metrics, prog_bar=True)
         # self.log("hp_metric", acc)
         return loss
@@ -99,7 +97,7 @@ class MNISTModel(pl.LightningModule):
         y_hat = self(X)
         loss = self.loss(y_hat, y)
         acc = self.test_acc(y_hat, y)
-        metrics = {"test_loss": loss, "test_acc": acc}
+        metrics = {"loss/test": loss, "acc/test": acc}
         self.log_dict(metrics, prog_bar=True)
         # self.log("hp_metric", acc)
         return loss
@@ -182,14 +180,14 @@ def lenet_5_traditional():
     pl.seed_everything(42)
 
     ck_train_loss = ModelCheckpoint(
-        monitor="train_loss", filename="model-{epoch:02d}-{train_loss:.2f}"
+        monitor="loss/train", filename="model-{epoch:02d}-{train_loss:.2f}"
     )
     ck_train_acc = ModelCheckpoint(
-        monitor="train_acc", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
+        monitor="acc/train", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
     )
-    ck_val_loss = ModelCheckpoint(monitor="val_loss", filename="model-{epoch:02d}-{val_loss:.2f}")
+    ck_val_loss = ModelCheckpoint(monitor="loss/val", filename="model-{epoch:02d}-{val_loss:.2f}")
     ck_val_acc = ModelCheckpoint(
-        monitor="val_acc", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
+        monitor="acc/val", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
     )
 
     data = MNISTDataModel()
@@ -200,7 +198,7 @@ def lenet_5_traditional():
     )
     logger = TensorBoardLogger(".", default_hp_metric=False, version="lenet_5_traditional")
     trainer = pl.Trainer(
-        max_epochs=1000,
+        max_epochs=100,
         logger=logger,
         callbacks=[ck_train_loss, ck_train_acc, ck_val_loss, ck_val_acc],
     )
@@ -217,7 +215,7 @@ def lenet_5_traditional():
 
 class LeNet5ModernModel(LeNet5Model):
     def __init__(self):
-        super().__init__(activation="ReLU", pool="max", weight_decay=1e-3)
+        super().__init__(activation="ReLU", pool="max", weight_decay=1e-4, optimizer="SGD")
         self.net.apply(self.init_weight)
 
     def init_weight(self, m):
@@ -229,27 +227,28 @@ def lenet_5_modern():
     pl.seed_everything(42)
 
     ck_train_loss = ModelCheckpoint(
-        monitor="train_loss", filename="model-{epoch:02d}-{train_loss:.2f}"
+        monitor="loss/train", filename="model-{epoch:02d}-{train_loss:.2f}"
     )
     ck_train_acc = ModelCheckpoint(
-        monitor="train_acc", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
+        monitor="acc/train", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
     )
-    ck_val_loss = ModelCheckpoint(monitor="val_loss", filename="model-{epoch:02d}-{val_loss:.2f}")
+    ck_val_loss = ModelCheckpoint(monitor="loss/val", filename="model-{epoch:02d}-{val_loss:.2f}")
     ck_val_acc = ModelCheckpoint(
-        monitor="val_acc", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
+        monitor="acc/val", mode="max", filename="model-{epoch:02d}-{val_acc:.2f}"
     )
 
-    data = MNISTDataModel()
+    data = MNISTDataModel(batch_size=512)
     model = LeNet5ModernModel()
-    logger = TensorBoardLogger(".", default_hp_metric=False, version="lenet_5_modern")
+    logger = TensorBoardLogger(".", default_hp_metric=False)  # version="lenet_5_modern"
     trainer = pl.Trainer(
-        max_epochs=1000,
+        max_epochs=100,
         logger=logger,
+        # log_every_n_steps=1,
         callbacks=[ck_train_loss, ck_train_acc, ck_val_loss, ck_val_acc],
     )
     tuner = Tuner(trainer)
 
-    tuner.lr_find(model, data, min_lr=1e-3, max_lr=1e-1, num_training=1000)
+    tuner.lr_find(model, data, min_lr=1e-3, max_lr=1e-1, num_training=200)
     trainer.fit(model, data)
     trainer.test(model, data)
 
