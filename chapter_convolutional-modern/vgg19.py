@@ -232,6 +232,6 @@ def load13():
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     load11to13()
-    # load13()
+    load13()
