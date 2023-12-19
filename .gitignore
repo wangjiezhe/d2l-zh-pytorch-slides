@@ -2,7 +2,7 @@
 data/
 __pycache__/
 .vscode/
-lightning_logs/
+*_logs/
 checkpoints/
 submission*.csv
 .lr_find_*

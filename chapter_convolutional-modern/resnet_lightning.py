@@ -136,9 +136,7 @@ class ResNeXtBlock(nn.Module):
     def __init__(self, bot_channels, output_channels, groups, use_1x1conv=False, strides=1):
         super().__init__()
         self.conv1 = nn.LazyConv2d(bot_channels, kernel_size=1, stride=1)
-        self.conv2 = nn.LazyConv2d(
-            bot_channels, kernel_size=3, stride=strides, padding=1, groups=groups
-        )
+        self.conv2 = nn.LazyConv2d(bot_channels, kernel_size=3, stride=strides, padding=1, groups=groups)
         self.conv3 = nn.LazyConv2d(output_channels, kernel_size=1, stride=1)
         self.bn1 = nn.LazyBatchNorm2d()
         self.bn2 = nn.LazyBatchNorm2d()
@@ -162,9 +160,7 @@ def resnext_block(bot_channels, output_channels, num_residuals, groups, first_bl
     blk = []
     for i in range(num_residuals):
         if i == 0 and not first_block:
-            blk.append(
-                ResNeXtBlock(bot_channels, output_channels, groups, use_1x1conv=True, strides=2)
-            )
+            blk.append(ResNeXtBlock(bot_channels, output_channels, groups, use_1x1conv=True, strides=2))
         elif i == 0:
             blk.append(ResNeXtBlock(bot_channels, output_channels, groups))
         else:
@@ -244,9 +240,7 @@ class ResNet(Classifier):
             ),
         )
         for i in range(4):
-            self.net.add_module(
-                f"conv{i+2}", nn.Sequential(*block(*arch[i], first_block=(i == 0)))
-            )
+            self.net.add_module(f"conv{i+2}", nn.Sequential(*block(*arch[i], first_block=(i == 0))))
         self.net.add_module(
             "last",
             nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(), nn.LazyLinear(num_classes)),
@@ -406,7 +400,7 @@ def cks(name):
     return [ck_train_loss, ck_train_acc, ck_val_loss, ck_val_acc]
 
 
-def train(model, epoch, logger_version=None, save_path=None, load_path=None, batch_size=128):
+def train(model, epoch, logger_version=None, save_path=None, load_path=None, batch_size=128, test=True):
     data = FashionMNISTDataModel(batch_size=batch_size)
     if load_path is not None:
         checkpoint = torch.load(load_path)
@@ -415,7 +409,8 @@ def train(model, epoch, logger_version=None, save_path=None, load_path=None, bat
     logger = TensorBoardLogger(".", default_hp_metric=False, version=logger_version)
     trainer = pl.Trainer(max_epochs=epoch, logger=logger)
     trainer.fit(model, data)
-    trainer.test(model, data)
+    if test:
+        trainer.test(model, data)
     if save_path is not None:
         trainer.save_checkpoint(save_path)
 
@@ -472,14 +467,16 @@ def train_resnet152_from101():
 
 
 def train_resnet152_from101_from50():
+    model = ResNet152(lr=1e-6)
     train(
-        ResNet152(),
-        20,
-        "ResNet152-from101-from50",
-        "ResNet152-from101-from50-epoch=20.ckpt",
-        "ResNet101-from50-epoch=20.ckpt",
-        batch_size=64,
+        model,
+        1,
+        "ResNet152-from101-from50_1",
+        load_path="ResNet101-from50-epoch=20.ckpt",
+        test=False,
     )
+    model.hparams.lr = 1e-4
+    train(model, 19, "ResNet152-from101-from50_2", save_path="ResNet152-from101-from50-epoch=20.ckpt")
 
 
 def train_resnext50():
@@ -497,7 +494,7 @@ if __name__ == "__main__":
     # train_resnet101()
     # train_resnet101_from50()
     # train_resnet152()
-    train_resnext50()
+    # train_resnext50()
     # train_resnet152_from101()
     # train_resnet152_from101_from50()
-    # pass
+    pass
